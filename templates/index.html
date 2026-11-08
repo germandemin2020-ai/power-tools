@@ -200,13 +200,19 @@
                 <!-- User Profile Header -->
                 <div class="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-center">
                     <img id="steam-avatar" src="" class="w-24 h-24 rounded-2xl border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20" alt="Avatar">
-                    <div class="flex-1 text-center md:text-left space-y-1">
+                    <div class="flex-1 text-center md:text-left space-y-2">
                         <div class="flex flex-wrap items-center justify-center md:justify-start gap-2">
                             <h3 id="steam-persona" class="text-2xl font-bold text-white">Nickname</h3>
                             <span id="steam-online-badge" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-300">Offline</span>
+                            <span id="steam-level-badge" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">LVL 0</span>
+                            <span id="steam-badges-badge" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">0 значков</span>
                         </div>
                         <p id="steam-status-msg" class="text-sm text-slate-400">Статус</p>
-                        <p class="text-xs font-mono text-slate-500 pt-1">SteamID64: <span id="steam-id64" class="text-slate-300">765611...</span></p>
+                        <div class="flex flex-wrap items-center justify-center md:justify-start gap-3 text-xs font-mono text-slate-500 pt-1">
+                            <span>SteamID64: <span id="steam-id64" class="text-slate-300">765611...</span></span>
+                            <span>•</span>
+                            <span id="steam-member-since">В Steam с: ...</span>
+                        </div>
                     </div>
                     <div class="text-right">
                         <span id="steam-vac-badge" class="px-3 py-1.5 rounded-xl text-xs font-bold font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -224,25 +230,39 @@
                     <div class="glass-panel p-4 rounded-xl text-center space-y-1">
                         <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Часов в играх</span>
                         <div id="steam-hours-count" class="text-2xl font-black text-cyan-400">0</div>
+                        <span id="steam-hours-subtext" class="text-[10px] text-slate-500 block">общее время</span>
                     </div>
                     <div class="glass-panel p-4 rounded-xl text-center space-y-1">
-                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Стена позора</span>
-                        <div id="steam-unplayed-percent" class="text-2xl font-black text-amber-400">0%</div>
-                        <span class="text-[10px] text-slate-500 block">незапущенных игр</span>
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">В библиотеке</span>
+                        <div id="steam-unplayed-percent" class="text-2xl font-black text-amber-400">0</div>
+                        <span id="steam-unplayed-subtext" class="text-[10px] text-slate-500 block">распознано игр</span>
                     </div>
                     <div class="glass-panel p-4 rounded-xl text-center space-y-1">
                         <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Стоимость игр</span>
                         <div id="steam-est-value" class="text-2xl font-black text-emerald-400">~0 ₽</div>
+                        <span id="steam-est-usd" class="text-[10px] text-slate-500 block">по ценам Steam</span>
                     </div>
                 </div>
 
-                <!-- Top Played Games List -->
+                <!-- Privacy tip banner if hours are hidden -->
+                <div id="steam-privacy-tip" class="hidden p-4 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-xs text-cyan-200 flex items-start space-x-3">
+                    <span class="text-base">💡</span>
+                    <div>
+                        <strong class="font-bold text-white">Игры успешно найдены!</strong> Время в играх скрыто политикой конфиденциальности Valve.
+                        <div class="text-cyan-300/80 mt-0.5">Чтобы в профиле отображались точные часы и топ по времени, откройте в Steam: <i>Редактировать профиль ➔ Приватность</i>, выберите <i>«Открытый»</i> для основных данных и снимите галочку <i>«Скрывать общее время в игре»</i>.</div>
+                    </div>
+                </div>
+
+                <!-- Games List -->
                 <div class="glass-panel p-6 rounded-2xl space-y-4">
-                    <h4 class="font-bold text-lg text-white flex items-center space-x-2">
-                        <span>🏆</span>
-                        <span>Топ самых наигранных игр:</span>
+                    <h4 class="font-bold text-lg text-white flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span>🎮</span>
+                            <span id="steam-games-heading">Игры в библиотеке:</span>
+                        </div>
+                        <span id="steam-games-badge-count" class="text-xs font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">0</span>
                     </h4>
-                    <div id="steam-top-games" class="space-y-3">
+                    <div id="steam-top-games" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <!-- Populated by JS -->
                     </div>
                 </div>
@@ -424,6 +444,23 @@
                 document.getElementById('steam-persona').textContent = data.steamID;
                 document.getElementById('steam-status-msg').textContent = data.stateMessage;
                 document.getElementById('steam-id64').textContent = data.steamID64;
+                document.getElementById('steam-member-since').textContent = "В Steam с: " + (data.memberSince || "—");
+
+                const levelBadge = document.getElementById('steam-level-badge');
+                if (data.level) {
+                    levelBadge.textContent = `⚡ Уровень ${data.level}`;
+                    levelBadge.classList.remove('hidden');
+                } else {
+                    levelBadge.classList.add('hidden');
+                }
+
+                const badgesBadge = document.getElementById('steam-badges-badge');
+                if (data.badges) {
+                    badgesBadge.textContent = `🎖 ${data.badges} значков`;
+                    badgesBadge.classList.remove('hidden');
+                } else {
+                    badgesBadge.classList.add('hidden');
+                }
 
                 const onlineBadge = document.getElementById('steam-online-badge');
                 if (data.onlineState === 'in-game') {
@@ -447,9 +484,29 @@
                 }
 
                 document.getElementById('steam-games-count').textContent = data.totalGames;
-                document.getElementById('steam-hours-count').textContent = `${data.totalHours} ч`;
-                document.getElementById('steam-unplayed-percent').textContent = `${data.unplayedPercent}%`;
+
+                if (data.hoursHidden) {
+                    document.getElementById('steam-hours-count').textContent = "Скрыто 🔒";
+                    document.getElementById('steam-hours-subtext').textContent = "в приватности Steam";
+                    document.getElementById('steam-unplayed-percent').textContent = data.topGames ? data.topGames.length : data.totalGames;
+                    document.getElementById('steam-unplayed-subtext').textContent = "распознано игр";
+                    document.getElementById('steam-privacy-tip').classList.remove('hidden');
+                    document.getElementById('steam-games-heading').textContent = "Популярные игры в библиотеке:";
+                } else {
+                    document.getElementById('steam-hours-count').textContent = `${data.totalHours} ч`;
+                    document.getElementById('steam-hours-subtext').textContent = "общее время";
+                    document.getElementById('steam-unplayed-percent').textContent = `${data.unplayedPercent}%`;
+                    document.getElementById('steam-unplayed-subtext').textContent = "незапущенных игр";
+                    document.getElementById('steam-privacy-tip').classList.add('hidden');
+                    document.getElementById('steam-games-heading').textContent = "Топ самых наигранных игр:";
+                }
+
                 document.getElementById('steam-est-value').textContent = `~${data.estimatedValue} ₽`;
+                if (data.estimatedValueUsd) {
+                    document.getElementById('steam-est-usd').textContent = `~$${data.estimatedValueUsd} по ценам магазина`;
+                }
+
+                document.getElementById('steam-games-badge-count').textContent = `${data.topGames ? data.topGames.length : 0} из ${data.totalGames}`;
 
                 const topContainer = document.getElementById('steam-top-games');
                 topContainer.innerHTML = "";
@@ -457,20 +514,35 @@
                 if (data.topGames && data.topGames.length > 0) {
                     data.topGames.forEach((g, idx) => {
                         const item = document.createElement('div');
-                        item.className = "flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-white/5";
+                        item.className = "flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-white/5 hover:border-cyan-500/30 transition-all duration-200 group";
+                        
+                        let rightBadge = "";
+                        if (g.hours > 0) {
+                            rightBadge = `<span class="font-mono text-xs font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-md border border-cyan-500/20">${g.hours} ч.</span>`;
+                        } else if (g.price && g.price !== 'Free' && g.price !== 'Free or No Price') {
+                            rightBadge = `<span class="font-mono text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">${g.price}</span>`;
+                        } else {
+                            rightBadge = `<span class="font-mono text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded-md">Free-to-Play</span>`;
+                        }
+
                         item.innerHTML = `
-                            <div class="flex items-center space-x-3">
-                                <span class="font-mono text-xs font-bold text-slate-500">#${idx+1}</span>
-                                ${g.logo ? `<img src="${g.logo}" class="w-12 h-6 object-cover rounded" alt="">` : ''}
-                                <span class="text-sm font-semibold text-white">${g.name}</span>
+                            <div class="flex items-center space-x-3 overflow-hidden">
+                                <span class="font-mono text-xs font-bold text-slate-500 w-5 text-center">#${idx+1}</span>
+                                ${g.logo ? `<img src="${g.logo}" class="w-20 h-10 object-cover rounded-lg border border-white/10 shrink-0 group-hover:scale-105 transition-transform duration-200" alt="">` : ''}
+                                <div class="truncate">
+                                    <span class="text-sm font-semibold text-white truncate block">${g.name}</span>
+                                    <span class="text-[10px] text-slate-500 font-mono">AppID: ${g.appid || '—'}</span>
+                                </div>
                             </div>
-                            <span class="font-mono text-sm font-bold text-cyan-400">${g.hours} ч.</span>
+                            <div class="shrink-0 ml-2">
+                                ${rightBadge}
+                            </div>
                         `;
                         topContainer.appendChild(item);
                     });
                 } else {
                     topContainer.innerHTML = `
-                        <div class="text-sm text-slate-500 text-center py-4">
+                        <div class="col-span-2 text-sm text-slate-500 text-center py-6">
                             ${data.isPrivate ? "⚠️ Список игр скрыт настройками приватности этого профиля." : "Игры не найдены или библиотека пуста."}
                         </div>
                     `;
