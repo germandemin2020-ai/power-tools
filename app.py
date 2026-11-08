@@ -1,7 +1,7 @@
 import os
 import sys
 
-# Принудительно включаем UTF-8 для консоли Windows во избежание ошибок с кодировкой
+# Принудительно включаем UTF-8 для консоли Windows
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -23,7 +23,6 @@ app = Flask(__name__)
 
 DOWNLOADS_DIR = str(Path.home() / "Downloads")
 
-# Словарь для отслеживания прогресса загрузок
 download_tasks = {}
 
 def find_ffmpeg():
@@ -136,6 +135,10 @@ def run_download_thread(task_id, url, format_type):
     outtmpl = os.path.join(DOWNLOADS_DIR, "%(title)s.%(ext)s")
     ffmpeg_dir = find_ffmpeg()
 
+    # Гарантируем совместимость со всеми плеерами (Windows Media Player, Discord, iOS, Android):
+    # Принудительно пережимаем видео в H.264 (avc1) и звук в AAC (mp4a), чтобы открывалось абсолютно везде
+    compatibility_merger_args = ['-c:v', 'libx264', '-c:a', 'aac', '-preset', 'veryfast', '-crf', '22']
+
     if format_type == "mp3":
         ydl_opts = {
             'format': 'bestaudio/best',
@@ -152,20 +155,26 @@ def run_download_thread(task_id, url, format_type):
         }
     elif format_type == "720p":
         ydl_opts = {
-            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+            'format': 'bestvideo[height<=720][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[height<=720][vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[height<=720]+bestaudio/best[height<=720]/best',
             'merge_output_format': 'mp4',
             'outtmpl': outtmpl,
             'progress_hooks': [progress_hook],
+            'postprocessor_args': {
+                'merger': compatibility_merger_args
+            },
             'windowsfilenames': True,
             'quiet': True,
             'noplaylist': True
         }
     else: # 1080p
         ydl_opts = {
-            'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+            'format': 'bestvideo[height<=1080][ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[height<=1080][vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
             'merge_output_format': 'mp4',
             'outtmpl': outtmpl,
             'progress_hooks': [progress_hook],
+            'postprocessor_args': {
+                'merger': compatibility_merger_args
+            },
             'windowsfilenames': True,
             'quiet': True,
             'noplaylist': True
