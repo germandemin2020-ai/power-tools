@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerTools | Media Downloader & Steam Analytics</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: #090d16;
+            color: #f1f5f9;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glow-accent {
+            box-shadow: 0 0 40px -10px rgba(99, 102, 241, 0.35);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-white/10 bg-slate-950/60 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 flex items-center justify-center font-extrabold text-white shadow-lg shadow-indigo-500/25">
+                    ⚡
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">PowerTools Hub</h1>
+                    <p class="text-xs text-indigo-400 font-mono -mt-1">by German Demin • v2.0</p>
+                </div>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex p-1 bg-slate-900 border border-white/10 rounded-xl">
+                <button onclick="switchTab('downloader')" id="tab-downloader-btn" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 bg-brand-500 text-white shadow-md">
+                    <span>📥</span>
+                    <span>Скачивание медиа</span>
+                </button>
+                <button onclick="switchTab('steam')" id="tab-steam-btn" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-white">
+                    <span>🎮</span>
+                    <span>Аналитика Steam</span>
+                </button>
+            </div>
+
+            <!-- Quick Action: Open Downloads -->
+            <button onclick="openDownloadsFolder()" class="hidden sm:flex items-center space-x-2 text-xs font-mono text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20 transition-all">
+                <span>📁 Папка Загрузки</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-6 md:p-8 flex flex-col justify-center">
+
+        <!-- ================= TAB 1: MEDIA DOWNLOADER ================= -->
+        <section id="section-downloader" class="space-y-6">
+            <div class="text-center space-y-2 mb-8">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    YouTube • TikTok • Reels • VK • Twitter • Shorts
+                </span>
+                <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight">Универсальный медиа-загрузчик</h2>
+                <p class="text-slate-400 text-sm max-w-xl mx-auto">
+                    Скачивайте видео в 1080p, 720p или извлекайте аудио в MP3 без рекламы, водяных знаков и ограничений скорости.
+                </p>
+            </div>
+
+            <!-- Input URL Card -->
+            <div class="glass-panel p-6 rounded-2xl glow-accent space-y-4">
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="relative flex-1">
+                        <input type="text" id="media-url-input" placeholder="Вставьте ссылку на YouTube, TikTok, Reels или VK..." 
+                               class="w-full bg-slate-900/80 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all">
+                    </div>
+                    <button onclick="fetchMediaInfo()" id="fetch-info-btn" class="px-6 py-3.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 rounded-xl font-bold text-sm text-white transition-all shadow-lg shadow-indigo-600/30 flex items-center justify-center space-x-2">
+                        <span>Найти медиа</span>
+                        <span>🔍</span>
+                    </button>
+                </div>
+                <div id="fetch-loader" class="hidden text-center py-4 text-sm text-indigo-400 animate-pulse">
+                    ⚡ Анализирую видеопоток и доступные форматы...
+                </div>
+            </div>
+
+            <!-- Video Info Preview Card (Hidden by default) -->
+            <div id="video-preview-card" class="hidden glass-panel p-6 rounded-2xl border-indigo-500/30 space-y-6">
+                <div class="flex flex-col md:flex-row gap-6 items-center">
+                    <img id="prev-thumbnail" src="" class="w-full md:w-56 h-36 object-cover rounded-xl border border-white/10 shadow-lg" alt="Thumbnail">
+                    <div class="flex-1 space-y-2 text-center md:text-left">
+                        <span id="prev-platform" class="text-xs font-bold px-2.5 py-1 rounded-md bg-white/10 text-white font-mono">YouTube</span>
+                        <h3 id="prev-title" class="text-lg font-bold text-white line-clamp-2">Заголовок видео</h3>
+                        <p class="text-sm text-slate-400">Автор: <span id="prev-author" class="text-slate-200 font-medium">Канал</span></p>
+                        <div class="flex flex-wrap gap-4 text-xs font-mono text-slate-400 pt-1">
+                            <span>⏱ Длительность: <b id="prev-duration" class="text-white">--</b></span>
+                            <span id="prev-views-container">👁 Просмотры: <b id="prev-views" class="text-white">--</b></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Download Options -->
+                <div class="pt-4 border-t border-white/10 flex flex-wrap gap-3 justify-center md:justify-start">
+                    <button onclick="startDownload('1080p')" class="flex-1 min-w-[140px] px-4 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-bold text-white transition-all flex items-center justify-center space-x-2 shadow-md">
+                        <span>🎬</span>
+                        <span>Скачать 1080p MP4</span>
+                    </button>
+                    <button onclick="startDownload('720p')" class="flex-1 min-w-[140px] px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-white/10 rounded-xl text-sm font-bold text-white transition-all flex items-center justify-center space-x-2">
+                        <span>📹</span>
+                        <span>Скачать 720p MP4</span>
+                    </button>
+                    <button onclick="startDownload('mp3')" class="flex-1 min-w-[140px] px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl text-sm font-bold text-white transition-all flex items-center justify-center space-x-2 shadow-md">
+                        <span>🎵</span>
+                        <span>Извлечь MP3</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Download Progress Panel (Hidden by default) -->
+            <div id="progress-panel" class="hidden glass-panel p-6 rounded-2xl border-emerald-500/30 space-y-4">
+                <div class="flex justify-between items-center text-sm">
+                    <span id="progress-status-text" class="font-bold text-emerald-400">Загрузка файла...</span>
+                    <span id="progress-percent" class="font-mono text-white font-bold">0%</span>
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden border border-white/10">
+                    <div id="progress-bar-fill" class="bg-gradient-to-r from-indigo-500 to-emerald-400 h-full w-0 transition-all duration-300"></div>
+                </div>
+                <div class="flex justify-between text-xs font-mono text-slate-400">
+                    <span>Скорость: <b id="progress-speed" class="text-white">--</b></span>
+                    <span>Осталось: <b id="progress-eta" class="text-white">--</b></span>
+                </div>
+                <div id="download-success-box" class="hidden pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 bg-emerald-950/40 border border-emerald-500/30 p-4 rounded-xl">
+                    <div class="text-xs text-emerald-300">
+                        ✅ Файл успешно сохранён в вашу папку <b>Загрузки (Downloads)</b>!
+                    </div>
+                    <button onclick="openDownloadsFolder()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all">
+                        Открыть папку Загрузки 📂
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= TAB 2: STEAM ANALYTICS ================= -->
+        <section id="section-steam" class="hidden space-y-6">
+            <div class="text-center space-y-2 mb-8">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    Steam Profile & Inventory Auditor
+                </span>
+                <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight">Аналитика Steam-аккаунта</h2>
+                <p class="text-slate-400 text-sm max-w-xl mx-auto">
+                    Введите ссылку на профиль, логин или SteamID64, чтобы узнать реальную стоимость библиотеки, суммарные часы и «стену позора».
+                </p>
+            </div>
+
+            <!-- Input Steam ID Card -->
+            <div class="glass-panel p-6 rounded-2xl glow-accent space-y-4">
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="relative flex-1">
+                        <input type="text" id="steam-query-input" placeholder="Вставьте ссылку на профиль Steam или ник..." 
+                               class="w-full bg-slate-900/80 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all">
+                    </div>
+                    <button onclick="analyzeSteamProfile()" id="steam-btn" class="px-6 py-3.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl font-bold text-sm text-white transition-all shadow-lg shadow-cyan-600/30 flex items-center justify-center space-x-2">
+                        <span>Анализировать</span>
+                        <span>📊</span>
+                    </button>
+                </div>
+                <div id="steam-loader" class="hidden text-center py-4 text-sm text-cyan-400 animate-pulse">
+                    🎮 Подключаюсь к Steam Community XML и считываю библиотеку...
+                </div>
+            </div>
+
+            <!-- Steam Result Dashboard (Hidden by default) -->
+            <div id="steam-results-card" class="hidden space-y-6">
+                <!-- User Profile Header -->
+                <div class="glass-panel p-6 rounded-2xl flex flex-col md:flex-row gap-6 items-center">
+                    <img id="steam-avatar" src="" class="w-24 h-24 rounded-2xl border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20" alt="Avatar">
+                    <div class="flex-1 text-center md:text-left space-y-1">
+                        <div class="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                            <h3 id="steam-persona" class="text-2xl font-bold text-white">Nickname</h3>
+                            <span id="steam-online-badge" class="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-300">Offline</span>
+                        </div>
+                        <p id="steam-status-msg" class="text-sm text-slate-400">Статус</p>
+                        <p class="text-xs font-mono text-slate-500 pt-1">SteamID64: <span id="steam-id64" class="text-slate-300">765611...</span></p>
+                    </div>
+                    <div class="text-right">
+                        <span id="steam-vac-badge" class="px-3 py-1.5 rounded-xl text-xs font-bold font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            🛡 Без блокировок (VAC Clean)
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="glass-panel p-4 rounded-xl text-center space-y-1">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Всего игр</span>
+                        <div id="steam-games-count" class="text-2xl font-black text-white">0</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center space-y-1">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Часов в играх</span>
+                        <div id="steam-hours-count" class="text-2xl font-black text-cyan-400">0</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center space-y-1">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Стена позора</span>
+                        <div id="steam-unplayed-percent" class="text-2xl font-black text-amber-400">0%</div>
+                        <span class="text-[10px] text-slate-500 block">незапущенных игр</span>
+                    </div>
+                    <div class="glass-panel p-4 rounded-xl text-center space-y-1">
+                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Стоимость игр</span>
+                        <div id="steam-est-value" class="text-2xl font-black text-emerald-400">~0 ₽</div>
+                    </div>
+                </div>
+
+                <!-- Top Played Games List -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <h4 class="font-bold text-lg text-white flex items-center space-x-2">
+                        <span>🏆</span>
+                        <span>Топ самых наигранных игр:</span>
+                    </h4>
+                    <div id="steam-top-games" class="space-y-3">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 border-t border-white/5 text-xs text-slate-500 font-mono">
+        PowerTools Suite • Собрано для локального использования • 2026
+    </footer>
+
+    <!-- Frontend Script -->
+    <script>
+        let currentUrl = "";
+        let currentTaskId = null;
+        let pollInterval = null;
+
+        function switchTab(tab) {
+            const dlSec = document.getElementById('section-downloader');
+            const stSec = document.getElementById('section-steam');
+            const dlBtn = document.getElementById('tab-downloader-btn');
+            const stBtn = document.getElementById('tab-steam-btn');
+
+            if (tab === 'downloader') {
+                dlSec.classList.remove('hidden');
+                stSec.classList.add('hidden');
+                dlBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 bg-brand-500 text-white shadow-md";
+                stBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-white";
+            } else {
+                dlSec.classList.add('hidden');
+                stSec.classList.remove('hidden');
+                stBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 bg-cyan-600 text-white shadow-md";
+                dlBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center space-x-2 text-slate-400 hover:text-white";
+            }
+        }
+
+        async function fetchMediaInfo() {
+            const url = document.getElementById('media-url-input').value.trim();
+            if (!url) return alert("Пожалуйста, вставьте ссылку на видео!");
+
+            currentUrl = url;
+            const loader = document.getElementById('fetch-loader');
+            const preview = document.getElementById('video-preview-card');
+            const progress = document.getElementById('progress-panel');
+
+            loader.classList.remove('hidden');
+            preview.classList.add('hidden');
+            progress.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/info', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url: url})
+                });
+                const data = await res.json();
+                loader.classList.add('hidden');
+
+                if (data.error) {
+                    alert("Ошибка: " + data.error);
+                    return;
+                }
+
+                document.getElementById('prev-thumbnail').src = data.thumbnail;
+                document.getElementById('prev-title').textContent = data.title;
+                document.getElementById('prev-author').textContent = data.author;
+                document.getElementById('prev-duration').textContent = data.duration;
+                document.getElementById('prev-platform').textContent = data.platform;
+
+                if (data.views) {
+                    document.getElementById('prev-views').textContent = data.views;
+                    document.getElementById('prev-views-container').classList.remove('hidden');
+                } else {
+                    document.getElementById('prev-views-container').classList.add('hidden');
+                }
+
+                preview.classList.remove('hidden');
+            } catch (err) {
+                loader.classList.add('hidden');
+                alert("Ошибка сети: " + err);
+            }
+        }
+
+        async function startDownload(format) {
+            const progress = document.getElementById('progress-panel');
+            const successBox = document.getElementById('download-success-box');
+            
+            progress.classList.remove('hidden');
+            successBox.classList.add('hidden');
+            document.getElementById('progress-status-text').textContent = `Запуск скачивания (${format.toUpperCase()})...`;
+            document.getElementById('progress-percent').textContent = "0%";
+            document.getElementById('progress-bar-fill').style.width = "0%";
+
+            try {
+                const res = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url: currentUrl, format: format})
+                });
+                const data = await res.json();
+                if (data.error) return alert("Ошибка: " + data.error);
+
+                currentTaskId = data.task_id;
+                if (pollInterval) clearInterval(pollInterval);
+                pollInterval = setInterval(checkProgress, 1000);
+            } catch (err) {
+                alert("Ошибка старта: " + err);
+            }
+        }
+
+        async function checkProgress() {
+            if (!currentTaskId) return;
+
+            try {
+                const res = await fetch(`/api/progress/${currentTaskId}`);
+                const data = await res.json();
+
+                if (data.status === 'downloading') {
+                    document.getElementById('progress-status-text').textContent = "Скачивание в процессе...";
+                    document.getElementById('progress-percent').textContent = `${data.percent}%`;
+                    document.getElementById('progress-bar-fill').style.width = `${data.percent}%`;
+                    document.getElementById('progress-speed').textContent = data.speed || "--";
+                    document.getElementById('progress-eta').textContent = data.eta || "--";
+                } else if (data.status === 'processing') {
+                    document.getElementById('progress-status-text').textContent = "Обработка и сохранение аудио/видео...";
+                    document.getElementById('progress-percent').textContent = "100%";
+                    document.getElementById('progress-bar-fill').style.width = "100%";
+                } else if (data.status === 'finished') {
+                    clearInterval(pollInterval);
+                    document.getElementById('progress-status-text').textContent = "Загрузка завершена!";
+                    document.getElementById('progress-percent').textContent = "100%";
+                    document.getElementById('progress-bar-fill').style.width = "100%";
+                    document.getElementById('download-success-box').classList.remove('hidden');
+                } else if (data.status === 'error') {
+                    clearInterval(pollInterval);
+                    document.getElementById('progress-status-text').textContent = "Ошибка загрузки: " + data.error;
+                    document.getElementById('progress-status-text').classList.replace('text-emerald-400', 'text-rose-400');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function openDownloadsFolder() {
+            try {
+                await fetch('/api/open-downloads', {method: 'POST'});
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function analyzeSteamProfile() {
+            const query = document.getElementById('steam-query-input').value.trim();
+            if (!query) return alert("Введите ссылку или Steam ID!");
+
+            const loader = document.getElementById('steam-loader');
+            const resultCard = document.getElementById('steam-results-card');
+
+            loader.classList.remove('hidden');
+            resultCard.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/steam', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({query: query})
+                });
+                const data = await res.json();
+                loader.classList.add('hidden');
+
+                if (data.error) {
+                    alert("Ошибка: " + data.error);
+                    return;
+                }
+
+                document.getElementById('steam-avatar').src = data.avatar || "https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg";
+                document.getElementById('steam-persona').textContent = data.steamID;
+                document.getElementById('steam-status-msg').textContent = data.stateMessage;
+                document.getElementById('steam-id64').textContent = data.steamID64;
+
+                const onlineBadge = document.getElementById('steam-online-badge');
+                if (data.onlineState === 'in-game') {
+                    onlineBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                    onlineBadge.textContent = "В игре";
+                } else if (data.onlineState === 'online') {
+                    onlineBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30";
+                    onlineBadge.textContent = "В сети";
+                } else {
+                    onlineBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-400";
+                    onlineBadge.textContent = "Офлайн";
+                }
+
+                const vacBadge = document.getElementById('steam-vac-badge');
+                if (data.vacBanned) {
+                    vacBadge.className = "px-3 py-1.5 rounded-xl text-xs font-bold font-mono bg-rose-500/20 text-rose-400 border border-rose-500/30";
+                    vacBadge.textContent = "❌ ЕСТЬ БАН VAC";
+                } else {
+                    vacBadge.className = "px-3 py-1.5 rounded-xl text-xs font-bold font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                    vacBadge.textContent = "🛡 Без блокировок (VAC Clean)";
+                }
+
+                document.getElementById('steam-games-count').textContent = data.totalGames;
+                document.getElementById('steam-hours-count').textContent = `${data.totalHours} ч`;
+                document.getElementById('steam-unplayed-percent').textContent = `${data.unplayedPercent}%`;
+                document.getElementById('steam-est-value').textContent = `~${data.estimatedValue} ₽`;
+
+                const topContainer = document.getElementById('steam-top-games');
+                topContainer.innerHTML = "";
+
+                if (data.topGames && data.topGames.length > 0) {
+                    data.topGames.forEach((g, idx) => {
+                        const item = document.createElement('div');
+                        item.className = "flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-white/5";
+                        item.innerHTML = `
+                            <div class="flex items-center space-x-3">
+                                <span class="font-mono text-xs font-bold text-slate-500">#${idx+1}</span>
+                                ${g.logo ? `<img src="${g.logo}" class="w-12 h-6 object-cover rounded" alt="">` : ''}
+                                <span class="text-sm font-semibold text-white">${g.name}</span>
+                            </div>
+                            <span class="font-mono text-sm font-bold text-cyan-400">${g.hours} ч.</span>
+                        `;
+                        topContainer.appendChild(item);
+                    });
+                } else {
+                    topContainer.innerHTML = `
+                        <div class="text-sm text-slate-500 text-center py-4">
+                            ${data.isPrivate ? "⚠️ Список игр скрыт настройками приватности этого профиля." : "Игры не найдены или библиотека пуста."}
+                        </div>
+                    `;
+                }
+
+                resultCard.classList.remove('hidden');
+            } catch (err) {
+                loader.classList.add('hidden');
+                alert("Ошибка запроса: " + err);
+            }
+        }
+    </script>
+</body>
+</html>
