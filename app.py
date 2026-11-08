@@ -1,6 +1,7 @@
 import os
 import sys
 import re
+import shutil
 import threading
 import uuid
 import time
@@ -15,6 +16,34 @@ DOWNLOADS_DIR = str(Path.home() / "Downloads")
 
 # Словарь для отслеживания прогресса загрузок
 download_tasks = {}
+
+def find_ffmpeg():
+    """
+    Автоматически находит установленный FFmpeg на компьютере
+    """
+    # 1. Проверяем стандартный PATH
+    p = shutil.which("ffmpeg")
+    if p:
+        return os.path.dirname(p)
+    
+    # 2. Проверяем пакеты WinGet
+    local_app_data = os.environ.get("LOCALAPPDATA", "")
+    winget_pkgs = os.path.join(local_app_data, "Microsoft", "WinGet", "Packages")
+    if os.path.exists(winget_pkgs):
+        for root, dirs, files in os.walk(winget_pkgs):
+            if "ffmpeg.exe" in files:
+                return root
+
+    # 3. Проверяем стандартные пути
+    for common in [
+        r"C:\ffmpeg\bin",
+        r"C:\Program Files\ffmpeg\bin",
+        os.path.join(local_app_data, "Programs", "ffmpeg", "bin")
+    ]:
+        if os.path.exists(os.path.join(common, "ffmpeg.exe")):
+            return common
+            
+    return None
 
 def get_platform_badge(url):
     url_lower = url.lower()
@@ -99,6 +128,7 @@ def run_download_thread(task_id, url, format_type):
             task["status"] = "processing"
 
     outtmpl = os.path.join(DOWNLOADS_DIR, "%(title)s.%(ext)s")
+    ffmpeg_dir = find_ffmpeg()
 
     if format_type == "mp3":
         ydl_opts = {
@@ -110,37 +140,52 @@ def run_download_thread(task_id, url, format_type):
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
+            'windowsfilenames': True,
             'quiet': True,
             'noplaylist': True
         }
     elif format_type == "720p":
         ydl_opts = {
-            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best',
+            # Берем лучшее видео до 720p + лучший звук и склеиваем в mp4
+            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+            'merge_output_format': 'mp4',
             'outtmpl': outtmpl,
             'progress_hooks': [progress_hook],
+            'windowsfilenames': True,
             'quiet': True,
             'noplaylist': True
         }
     else: # 1080p
         ydl_opts = {
-            'format': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]/best',
+            # Берем лучшее видео до 1080p + лучший звук и склеиваем в mp4
+            'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+            'merge_output_format': 'mp4',
             'outtmpl': outtmpl,
             'progress_hooks': [progress_hook],
+            'windowsfilenames': True,
             'quiet': True,
             'noplaylist': True
         }
 
+    if ffmpeg_dir:
+        ydl_opts['ffmpeg_location'] = ffmpeg_dir
+        print(f"Используется FFmpeg: {ffmpeg_dir}")
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            task["filename"] = ydl.prepare_filename(info)
+            filename = ydl.prepare_filename(info)
             if format_type == "mp3":
-                task["filename"] = os.path.splitext(task["filename"])[0] + ".mp3"
+                filename = os.path.splitext(filename)[0] + ".mp3"
+            elif format_type in ["1080p", "720p"]:
+                filename = os.path.splitext(filename)[0] + ".mp4"
+                
+            task["filename"] = filename
             task["status"] = "finished"
             task["percent"] = 100
     except Exception as e:
         task["status"] = "error"
-        task["error"] = str(e)[:150]
+        task["error"] = str(e)[:180]
 
 @app.route("/api/download", methods=["POST"])
 def start_download():
@@ -190,8 +235,6 @@ def analyze_steam():
     if not query:
         return jsonify({"error": "Введите ссылку на Steam или Steam ID"}), 400
 
-    # Извлечение ID или vanity имени
-    # Примеры: https://steamcommunity.com/id/username/ или https://steamcommunity.com/profiles/76561198.../ или просто username
     clean_query = query.rstrip("/")
     if "/id/" in clean_query:
         target = clean_query.split("/id/")[-1]
@@ -217,7 +260,6 @@ def analyze_steam():
 
         root = ET.fromstring(resp.content)
         
-        # Проверка на ошибку в XML
         error_node = root.find("error")
         if error_node is not None:
             return jsonify({"error": error_node.text or "Профиль не найден"}), 404
@@ -230,13 +272,10 @@ def analyze_steam():
         vac_banned = root.findtext("vacBanned", "0") == "1"
         trade_ban = root.findtext("tradeBanState", "None")
         member_since = root.findtext("memberSince", "Скрыто")
-        custom_url = root.findtext("customURL", "")
         privacy_state = root.findtext("privacyState", "public")
         
-        # Очистка stateMessage от HTML тегов
         clean_state_msg = re.sub(r'<[^>]+>', '', state_msg).strip()
 
-        # Попытка вытянуть список игр
         games = []
         total_hours = 0.0
         try:
@@ -261,15 +300,11 @@ def analyze_steam():
         except Exception:
             pass
 
-        # Сортируем топ-5 игр по наигранным часам
         games.sort(key=lambda x: x["hours"], reverse=True)
         top_games = games[:5]
 
-        # Расчетные показатели
         unplayed_count = sum(1 for g in games if g["hours"] == 0)
         unplayed_percent = round((unplayed_count / len(games) * 100)) if games else 0
-
-        # Ориентировочная стоимость библиотеки (в среднем 850 руб за купленную игру)
         estimated_value = len(games) * 850
 
         return jsonify({
@@ -294,6 +329,10 @@ def analyze_steam():
         return jsonify({"error": f"Ошибка анализа профиля: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    print(f"🚀 PowerTools сервер запущен на http://127.0.0.1:5000")
+    ffmpeg_detected = find_ffmpeg()
+    print("==================================================")
+    print(f"🚀 PowerTools запущен на http://127.0.0.1:5000")
+    print(f"🎬 FFmpeg статус: {'Обнаружен (' + ffmpeg_detected + ')' if ffmpeg_detected else 'НЕ НАЙДЕН'}")
     print(f"📁 Папка сохранения: {DOWNLOADS_DIR}")
+    print("==================================================")
     app.run(host="127.0.0.1", port=5000, debug=False)
