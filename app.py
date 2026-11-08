@@ -447,10 +447,10 @@ def analyze_steam():
         unplayed_count = sum(1 for g in games if g["hours"] == 0)
         unplayed_percent = round((unplayed_count / len(games) * 100)) if games and not hours_hidden else 0
 
-        if est_val_usd > 0:
+        if est_val_usd > 5:
             estimated_value_rub = est_val_usd * 95
         else:
-            estimated_value_rub = total_games_count * 650
+            estimated_value_rub = total_games_count * 600
 
         return jsonify({
             "steamID": steam_id,
