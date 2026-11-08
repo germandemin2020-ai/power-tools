@@ -295,6 +295,10 @@ def analyze_steam():
         level = 0
         badges_cnt = 0
         html_games_cnt = 0
+        games = []
+        total_hours = 0.0
+        est_val_usd = 0
+
         try:
             r_html = requests.get(profile_url, headers=headers, timeout=8)
             if r_html.status_code == 200:
@@ -308,55 +312,74 @@ def analyze_steam():
                 m_badges = re.search(r'href="[^"]*/badges/"[^>]*>.*?<span class="profile_count_link_total">\s*(\d+)\s*</span>', html_text, re.DOTALL)
                 if m_badges:
                     badges_cnt = int(m_badges.group(1))
+
+                # Also parse any recently played games shown on profile
+                for rg in re.findall(r'<div class="recent_game">(.*?)</div>\s*</div>\s*</div>', html_text, re.DOTALL):
+                    name_match = re.search(r'<div class="game_name">\s*<a[^>]*>(.*?)</a>', rg)
+                    hours_match = re.search(r'([\d\.,]+)\s+(?:hrs|ч)', rg)
+                    appid_match = re.search(r'/app/(\d+)', rg)
+                    if name_match:
+                        g_name = re.sub(r'<[^>]+>', '', name_match.group(1)).strip()
+                        g_appid = appid_match.group(1) if appid_match else None
+                        g_hrs = float(hours_match.group(1).replace(",", ".")) if hours_match else 0.0
+                        total_hours += g_hrs
+                        g_logo = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{g_appid}/header.jpg" if g_appid else ""
+                        games.append({
+                            "name": g_name,
+                            "appid": g_appid,
+                            "hours": g_hrs,
+                            "price": "В библиотеке",
+                            "logo": g_logo
+                        })
         except Exception:
             pass
-
-        games = []
-        total_hours = 0.0
-        est_val_usd = 0
 
         # Attempt 1: Legacy XML (works if target profile allows anonymous game details)
-        games_xml_url = f"https://steamcommunity.com/profiles/{steam_id64}/games?xml=1"
-        try:
-            g_resp = requests.get(games_xml_url, headers=headers, timeout=5)
-            if g_resp.status_code == 200 and "<gamesList>" in g_resp.text:
-                g_root = ET.fromstring(g_resp.content)
-                for g in g_root.findall(".//game"):
-                    g_name = g.findtext("name", "")
-                    g_appid = g.findtext("appID", "")
-                    g_hours_str = g.findtext("hoursOnRecord", "0").replace(",", ".")
-                    try:
-                        g_hours = float(g_hours_str)
-                    except ValueError:
-                        g_hours = 0.0
-                    total_hours += g_hours
-                    g_logo = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{g_appid}/header.jpg" if g_appid else g.findtext("logo", "")
-                    games.append({
-                        "name": g_name,
-                        "appid": g_appid,
-                        "hours": g_hours,
-                        "price": "В библиотеке",
-                        "logo": g_logo
-                    })
-        except Exception:
-            pass
-
-        # Attempt 2: Fallback to SteamID lookup if XML is restricted/redirected
         if not games and steam_id64:
+            games_xml_url = f"https://steamcommunity.com/profiles/{steam_id64}/games?xml=1"
+            try:
+                g_resp = requests.get(games_xml_url, headers=headers, timeout=5)
+                if g_resp.status_code == 200 and "<gamesList>" in g_resp.text:
+                    g_root = ET.fromstring(g_resp.content)
+                    for g in g_root.findall(".//game"):
+                        g_name = g.findtext("name", "")
+                        g_appid = g.findtext("appID", "")
+                        g_hours_str = g.findtext("hoursOnRecord", "0").replace(",", ".")
+                        try:
+                            g_hours = float(g_hours_str)
+                        except ValueError:
+                            g_hours = 0.0
+                        total_hours += g_hours
+                        g_logo = f"https://cdn.cloudflare.steamstatic.com/steam/apps/{g_appid}/header.jpg" if g_appid else g.findtext("logo", "")
+                        games.append({
+                            "name": g_name,
+                            "appid": g_appid,
+                            "hours": g_hours,
+                            "price": "В библиотеке",
+                            "logo": g_logo
+                        })
+            except Exception:
+                pass
+
+        # Attempt 2: Also query SteamID lookup for full catalog, prices, and banners
+        if steam_id64:
             try:
                 pro_url = f"https://steamid.pro/lookup/{steam_id64}"
                 r_pro = requests.get(pro_url, headers=headers, timeout=7)
                 if r_pro.status_code == 200:
                     match_table = re.search(r'<table class="table game-table">(.*?)</table>', r_pro.text, re.DOTALL)
                     if match_table:
+                        existing_names = {g["name"].lower() for g in games}
                         for row in re.findall(r'<tr>(.*?)</tr>', match_table.group(1), re.DOTALL):
                             gname = re.search(r'<td class="gname">(.*?)</td>', row)
                             gprice = re.search(r'<td class="gprice">(.*?)</td>', row)
                             gtime = re.search(r'<td class="gtime">(.*?)</td>', row)
                             appid_match = re.search(r'/apps/(\d+)/', row)
                             if gname:
-                                appid = appid_match.group(1) if appid_match else None
                                 name = re.sub(r'<[^>]+>', '', gname.group(1)).strip()
+                                if name.lower() in existing_names:
+                                    continue
+                                appid = appid_match.group(1) if appid_match else None
                                 price = gprice.group(1).strip() if gprice else "Free"
                                 time_str = gtime.group(1).strip() if gtime else "0h"
                                 hours = 0.0
@@ -375,16 +398,33 @@ def analyze_steam():
                                     "price": price,
                                     "logo": logo
                                 })
+                                existing_names.add(name.lower())
                     price_match = re.search(r'<span class="number-price">\$?(\d+)</span>', r_pro.text)
                     if price_match:
                         est_val_usd = int(price_match.group(1))
                     cnt_match = re.search(r'Games owned:.*?(\d+)', r_pro.text)
-                    if cnt_match and not html_games_cnt:
-                        html_games_cnt = int(cnt_match.group(1))
+                    if cnt_match:
+                        pro_cnt = int(cnt_match.group(1))
+                        if pro_cnt > html_games_cnt:
+                            html_games_cnt = pro_cnt
+            except Exception:
+                pass
+
+        # Attempt 3: Check Game Collector badge (badge 13)
+        if steam_id64 and html_games_cnt < 2:
+            try:
+                r_badge = requests.get(f"https://steamcommunity.com/profiles/{steam_id64}/badges/13", headers=headers, timeout=5)
+                if r_badge.status_code == 200:
+                    m_b = re.search(r'(?:games in library|игр[а-я]* в библиотеке)[:\s]*(\d+)|(\d+)\s+(?:games in library|игр[а-я]* в библиотеке)', r_badge.text, re.IGNORECASE)
+                    if m_b:
+                        b_cnt = int(m_b.group(1) or m_b.group(2))
+                        if b_cnt > html_games_cnt:
+                            html_games_cnt = b_cnt
             except Exception:
                 pass
 
         total_games_count = max(len(games), html_games_cnt)
+        is_games_private = (len(games) == 0 and total_games_count > 0)
         hours_hidden = (total_hours == 0 and total_games_count > 0)
 
         # Smart sorting: if hours available, sort by hours descending. If hours hidden, put paid games and popular titles first!
@@ -427,6 +467,7 @@ def analyze_steam():
             "totalGames": total_games_count,
             "totalHours": round(total_hours, 1),
             "hoursHidden": hours_hidden,
+            "isGamesPrivate": is_games_private,
             "unplayedCount": unplayed_count,
             "unplayedPercent": unplayed_percent,
             "estimatedValue": f"{estimated_value_rub:,}".replace(",", " "),
