@@ -540,6 +540,19 @@
                         `;
                         topContainer.appendChild(item);
                     });
+                } else if (data.isGamesPrivate || data.totalGames > 0) {
+                    topContainer.innerHTML = `
+                        <div class="col-span-2 p-6 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center space-y-3">
+                            <div class="text-3xl">🔒</div>
+                            <div class="font-bold text-white text-base">Список игр скрыт в настройках приватности Steam</div>
+                            <div class="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
+                                Steam подтверждает наличие <strong>${data.totalGames} игр</strong> на этом аккаунте (по значку Коллекционера), но Valve по умолчанию скрывает их названия и постеры от внешних сервисов.
+                            </div>
+                            <div class="pt-2 text-xs font-mono text-cyan-400 bg-black/40 py-2.5 px-4 rounded-xl inline-block border border-white/5">
+                                Решение: в клиенте Steam откройте <b>Редактировать профиль ➔ Приватность ➔ «Доступ к основным данным: Открытый»</b>
+                            </div>
+                        </div>
+                    `;
                 } else {
                     topContainer.innerHTML = `
                         <div class="col-span-2 text-sm text-slate-500 text-center py-6">
