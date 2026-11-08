@@ -1,5 +1,14 @@
 import os
 import sys
+
+# Принудительно включаем UTF-8 для консоли Windows во избежание ошибок с кодировкой
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 import re
 import shutil
 import threading
@@ -21,12 +30,10 @@ def find_ffmpeg():
     """
     Автоматически находит установленный FFmpeg на компьютере
     """
-    # 1. Проверяем стандартный PATH
     p = shutil.which("ffmpeg")
     if p:
         return os.path.dirname(p)
     
-    # 2. Проверяем пакеты WinGet
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     winget_pkgs = os.path.join(local_app_data, "Microsoft", "WinGet", "Packages")
     if os.path.exists(winget_pkgs):
@@ -34,7 +41,6 @@ def find_ffmpeg():
             if "ffmpeg.exe" in files:
                 return root
 
-    # 3. Проверяем стандартные пути
     for common in [
         r"C:\ffmpeg\bin",
         r"C:\Program Files\ffmpeg\bin",
@@ -48,20 +54,20 @@ def find_ffmpeg():
 def get_platform_badge(url):
     url_lower = url.lower()
     if "youtube.com" in url_lower or "youtu.be" in url_lower:
-        return "YouTube 🔴"
+        return "YouTube"
     elif "tiktok.com" in url_lower:
-        return "TikTok 🎵"
+        return "TikTok"
     elif "instagram.com" in url_lower:
-        return "Instagram Reels 📸"
+        return "Instagram Reels"
     elif "vk.com" in url_lower or "vkvideo.ru" in url_lower:
-        return "VK Видео 🔵"
+        return "VK Видео"
     elif "twitter.com" in url_lower or "x.com" in url_lower:
-        return "X / Twitter 🐦"
+        return "X / Twitter"
     elif "reddit.com" in url_lower:
-        return "Reddit 🟠"
+        return "Reddit"
     elif "twitch.tv" in url_lower:
-        return "Twitch 🟣"
-    return "Медиа 🌐"
+        return "Twitch"
+    return "Медиа"
 
 @app.route("/")
 def index():
@@ -146,7 +152,6 @@ def run_download_thread(task_id, url, format_type):
         }
     elif format_type == "720p":
         ydl_opts = {
-            # Берем лучшее видео до 720p + лучший звук и склеиваем в mp4
             'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
             'merge_output_format': 'mp4',
             'outtmpl': outtmpl,
@@ -157,7 +162,6 @@ def run_download_thread(task_id, url, format_type):
         }
     else: # 1080p
         ydl_opts = {
-            # Берем лучшее видео до 1080p + лучший звук и склеиваем в mp4
             'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
             'merge_output_format': 'mp4',
             'outtmpl': outtmpl,
@@ -169,7 +173,6 @@ def run_download_thread(task_id, url, format_type):
 
     if ffmpeg_dir:
         ydl_opts['ffmpeg_location'] = ffmpeg_dir
-        print(f"Используется FFmpeg: {ffmpeg_dir}")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -331,8 +334,8 @@ def analyze_steam():
 if __name__ == "__main__":
     ffmpeg_detected = find_ffmpeg()
     print("==================================================")
-    print(f"🚀 PowerTools запущен на http://127.0.0.1:5000")
-    print(f"🎬 FFmpeg статус: {'Обнаружен (' + ffmpeg_detected + ')' if ffmpeg_detected else 'НЕ НАЙДЕН'}")
-    print(f"📁 Папка сохранения: {DOWNLOADS_DIR}")
+    print("PowerTools server started at http://127.0.0.1:5000")
+    print(f"FFmpeg status: {'Found (' + ffmpeg_detected + ')' if ffmpeg_detected else 'NOT FOUND'}")
+    print(f"Save folder: {DOWNLOADS_DIR}")
     print("==================================================")
     app.run(host="127.0.0.1", port=5000, debug=False)
